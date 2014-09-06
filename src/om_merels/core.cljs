@@ -1,7 +1,8 @@
 ;; Merels
 
 (ns om-merels.core
-  (:require [om.core :as om :include-macros true]
+  (:require [om-merels.math :as math]
+            [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]))
 
 (def width 400)
@@ -21,15 +22,7 @@
    :centre-y y
    :piece :empty})
 
-(defn sin [a] (.sin js/Math a))
-(defn cos [a] (.cos js/Math a))
-(def pi (aget js/Math "PI"))
-
-(defn circle-position [angle radius]
-  {:x (* radius (cos angle))
-   :y (* radius (sin angle))})
-
-(def segment-angle (/ (* 2 pi) 8))
+(def segment-angle (/ (* 2 math/pi) 8))
 
 (defn offset-from-centre [{:keys [x y]}]
   {:x (+ centre-x x)
@@ -39,12 +32,10 @@
   (map #(* segment-angle %) (range 8)))
 
 (def outer-piece-positions
-  (map #(offset-from-centre (circle-position % spoke-length)) outer-piece-angles))
+  (map #(offset-from-centre (math/circle-position % spoke-length)) outer-piece-angles))
 
 (def outer-pieces
   (map (fn [{:keys [x y]}] (empty-piece x y)) outer-piece-positions))
-
-(range 0 segment-angle (* 2 pi))
 
 (def game-state
   (atom
