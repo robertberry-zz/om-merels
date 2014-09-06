@@ -31,12 +31,18 @@
 
 (def segment-angle (/ (* 2 pi) 8))
 
-(defn piece-at-angle [angle]
-  (let [{:keys [x y]} (circle-position angle spoke-length)]
-    (empty-piece (+ centre-x x) (+ centre-y y))))
+(defn offset-from-centre [{:keys [x y]}]
+  {:x (+ centre-x x)
+   :y (+ centre-y y)})
+
+(def outer-piece-angles
+  (map #(* segment-angle %) (range 8)))
+
+(def outer-piece-positions
+  (map #(offset-from-centre (circle-position % spoke-length)) outer-piece-angles))
 
 (def outer-pieces
-  (map #(piece-at-angle (* segment-angle %)) (range 8)))
+  (map piece-at-angle outer-piece-angles))
 
 (range 0 segment-angle (* 2 pi))
 
@@ -58,10 +64,20 @@
                      :strokeWidth 2
                      :fill (piece-fill piece)})))
 
+(defn stroke-from-centre [{:keys [x y]}]
+  (dom/line #js {:x1 centre-x :y1 :centre-y :x2 x :y2 y :stroke "black"}))
+
 (defn board-view [app owner]
   (om/component
     (apply dom/svg #js {:width width :height height}
-      (om/build-all position-view (:pieces app)))))
+      (dom/circle #js {:cx centre-x
+                       :cy centre-y
+                       :r spoke-length
+                       :stroke "black"
+                       :strokeWidth 2
+                       :fill "white"})
+      (concat (map stroke-from-centre outer-piece-positions)
+              (om/build-all position-view (:pieces app))))))
 
 
 (om/root board-view
