@@ -42,7 +42,7 @@
   (map #(offset-from-centre (circle-position % spoke-length)) outer-piece-angles))
 
 (def outer-pieces
-  (map piece-at-angle outer-piece-angles))
+  (map (fn [{:keys [x y]}] (empty-piece x y)) outer-piece-positions))
 
 (range 0 segment-angle (* 2 pi))
 
@@ -51,7 +51,16 @@
    {:turn :red
     :pieces (cons (empty-piece centre-x centre-y) outer-pieces)}))
 
-(def piece-fill {:empty "white"
+(defn winner [[centre & spokes]]
+  (let [winning-combos (map vector spokes (drop 4 spokes) (repeat centre))
+        is-victory? (fn [positions]
+                    (let [pieces-seen (into #{} (map :piece positions))]
+                      (and (= (count pieces-seen) 1) (not (pieces-seen :empty)))))]
+    (:piece (first (first (filter is-victory? winning-combos))))))
+
+(winner (:pieces @game-state))
+
+(def piece-fill {:empty "black"
                  :red "red"
                  :blue "blue"})
 
@@ -61,11 +70,11 @@
                      :cy centre-y
                      :r piece-radius
                      :stroke "black"
-                     :strokeWidth 2
+                     :strokeWidth 1
                      :fill (piece-fill piece)})))
 
 (defn stroke-from-centre [{:keys [x y]}]
-  (dom/line #js {:x1 centre-x :y1 :centre-y :x2 x :y2 y :stroke "black"}))
+  (dom/line #js {:x1 centre-x :y1 centre-y :x2 x :y2 y :stroke "black"}))
 
 (defn board-view [app owner]
   (om/component
@@ -74,7 +83,7 @@
                        :cy centre-y
                        :r spoke-length
                        :stroke "black"
-                       :strokeWidth 2
+                       :strokeWidth 1
                        :fill "white"})
       (concat (map stroke-from-centre outer-piece-positions)
               (om/build-all position-view (:pieces app))))))
