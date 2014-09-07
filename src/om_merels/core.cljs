@@ -8,12 +8,13 @@
             [cljs.core.async :refer [put! chan <!]]))
 
 (def width 400)
-(def height 400)
+(def height 450)
 
 (def centre-x (/ width 2))
 (def centre-y (/ height 2))
 
 (def piece-radius 15)
+(def piece-diameter (* piece-radius 2))
 
 (def spoke-length 150)
 
@@ -44,6 +45,8 @@
 (def game-state
   (atom
    {:turn :red
+    :players {:red {:remaining 3}
+              :blue {:remaining 3}}
     :pieces (cons (empty-piece centre-x centre-y) outer-pieces)}))
 
 (defn winner [[centre & spokes]]
@@ -77,6 +80,25 @@
 (defn transforming-piece [piece f]
   #(map (fn [p] (if (= p piece) (f p) p)) %))
 
+(defn pieces-view [app owner]
+  (reify
+    om/IRenderState
+    (render-state [_ {:keys [piece x y]}]
+      (let [remaining (:remaining app)
+            piece-margin 10
+            component-width (+ (* piece-diameter remaining) (* piece-margin (- remaining 1)))
+            left-x (- x (/ component-width 2))
+            left-x-centre (+ left-x piece-radius)]
+        (apply dom/g nil
+               (map (fn [n]
+                      (dom/circle #js {:cx (+ left-x-centre (* n (+ piece-margin piece-diameter)))
+                                       :cy y
+                                       :r piece-radius
+                                       :stroke "black"
+                                       :strokeWidth 2
+                                       :fill (piece-fill piece)}))
+                    (range remaining)))))))
+
 (defn board-view [app owner]
   (reify
     om/IInitState
@@ -101,6 +123,12 @@
                          :stroke "black"
                          :strokeWidth 1
                          :fill "white"})
+        (om/build pieces-view
+                  (get-in app [:players :red])
+                  {:init-state {:piece :red :x centre-x :y piece-diameter}})
+        (om/build pieces-view
+                  (get-in app [:players :blue])
+                  {:init-state {:piece :blue :x centre-x :y (- height piece-diameter)}})
         (concat (map stroke-from-centre outer-piece-positions)
                 (om/build-all position-view (:pieces app) {:init-state state}))))))
 
