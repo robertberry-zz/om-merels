@@ -53,8 +53,6 @@
                       (and (= (count pieces-seen) 1) (not (pieces-seen :empty)))))]
     (:piece (first (first (filter is-victory? winning-combos))))))
 
-(winner (:pieces @game-state))
-
 (def piece-fill {:empty "black"
                  :red "red"
                  :blue "blue"})
