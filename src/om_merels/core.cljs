@@ -1,9 +1,11 @@
 ;; Merels
 
 (ns om-merels.core
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [om-merels.math :as math]
             [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]))
+            [om.dom :as dom :include-macros true]
+            [cljs.core.async :refer [put! chan <!]]))
 
 (def width 400)
 (def height 400)
@@ -20,7 +22,9 @@
 (defn empty-piece [x y]
   {:centre-x x
    :centre-y y
-   :piece :empty})
+   :piece :empty
+   :mouse-over? nil
+   :selected? nil})
 
 (def segment-angle (/ (* 2 math/pi) 8))
 
@@ -55,29 +59,52 @@
                  :red "red"
                  :blue "blue"})
 
-(defn position-view [{:keys [centre-x centre-y piece]} owner]
-  (om/component
-    (dom/circle #js {:cx centre-x
-                     :cy centre-y
-                     :r piece-radius
-                     :stroke "black"
-                     :strokeWidth 1
-                     :fill (piece-fill piece)})))
+(defn position-view [{:keys [centre-x centre-y piece mouse-over? selected?] :as state} owner]
+  (reify
+    om/IRenderState
+    (render-state [_ {:keys [highlight]}]
+      (dom/circle #js {:cx centre-x
+                       :cy centre-y
+                       :r piece-radius
+                       :stroke (if mouse-over? "red" "black")
+                       :strokeWidth 2
+                       :fill (piece-fill piece)
+                       :onMouseOver (fn [_] (put! highlight state))
+                       :onMouseOut (fn [_] (put! highlight :clear))
+                       }))))
 
 (defn stroke-from-centre [{:keys [x y]}]
   (dom/line #js {:x1 centre-x :y1 centre-y :x2 x :y2 y :stroke "black"}))
 
+(defn transforming-piece [piece f]
+  #(map (fn [p] (if (= p piece) (f p) p)) %))
+
 (defn board-view [app owner]
-  (om/component
-    (apply dom/svg #js {:width width :height height}
-      (dom/circle #js {:cx centre-x
-                       :cy centre-y
-                       :r spoke-length
-                       :stroke "black"
-                       :strokeWidth 1
-                       :fill "white"})
-      (concat (map stroke-from-centre outer-piece-positions)
-              (om/build-all position-view (:pieces app))))))
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:highlight (chan)})
+    om/IWillMount
+    (will-mount [_]
+      (let [highlight (om/get-state owner :highlight)]
+        (go (loop []
+              (let [position (<! highlight)]
+                (om/transact! app :pieces
+                  (if (= :clear position)
+                    #(map (fn [piece] (assoc piece :mouse-over? nil)) %)
+                    (transforming-piece position #(assoc position :mouse-over? true)))))
+              (recur)))))
+    om/IRenderState
+    (render-state [_ state]
+      (apply dom/svg #js {:width width :height height}
+        (dom/circle #js {:cx centre-x
+                         :cy centre-y
+                         :r spoke-length
+                         :stroke "black"
+                         :strokeWidth 1
+                         :fill "white"})
+        (concat (map stroke-from-centre outer-piece-positions)
+                (om/build-all position-view (:pieces app) {:init-state state}))))))
 
 
 (om/root board-view
