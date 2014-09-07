@@ -44,7 +44,8 @@
 
 (def game-state
   (atom
-   {:turn :red
+   {:winner nil
+    :turn :red
     :players {:red {:remaining 3}
               :blue {:remaining 3}}
     :selected nil
@@ -101,6 +102,16 @@
                                        :fill (piece-fill piece)}))
                     (range remaining)))))))
 
+(defn switch-turn [app]
+  (om/transact! app :turn #(other-piece %)))
+
+(defn update-winner [app]
+  (let [pieces (:pieces @app)]
+    (om/update! app :winner (winner pieces))))
+
+(defn game-in-progress? [app]
+  (nil? (:winner @app)))
+
 (defn board-view [app owner]
   (reify
     om/IInitState
@@ -114,13 +125,15 @@
                (let [position (<! clicks)
                      turn (:turn @app)
                      remaining (get-in @app [:players turn :remaining])]
-                 (if (> remaining 0)
-                   (if (= (:piece position) :empty)
-                     (do
-                      (om/update! app [:players turn :remaining] (- remaining 1))
-                      (om/update! app :turn (other-piece turn))
-                      (om/transact! app :pieces 
-                                    (transforming-piece position #(assoc % :piece turn)))))))
+                   (when (game-in-progress? app)
+                     (if (> remaining 0)
+                       (if (= (:piece position) :empty)
+                         (do
+                           (om/update! app [:players turn :remaining] (- remaining 1))
+                           (om/transact! app :pieces 
+                                         (transforming-piece position #(assoc % :piece turn)))
+                           (update-winner app)
+                           (switch-turn app))))))
                (recur))))))
     om/IRenderState
     (render-state [_ state]
@@ -142,9 +155,14 @@
 
 (defn turn-view [app owner]
   (om/component
-   (let [turn (:turn app)]
-     (dom/p #js {:style #js {:color ({:red "#cc0000" :blue "#0000cc"} turn)}}
-            ({:red "Red's turn" :blue "Blue's turn"} turn)))))
+   (let [turn (:turn app)
+         winner (:winner app)
+         piece-text (fn [piece red-text blue-text]
+                      (dom/p #js {:style #js {:color ({:red "#cc0000" :blue "#0000cc"} piece)}}
+                             ({:red red-text :blue blue-text} piece)))]
+     (if (nil? winner)
+       (piece-text turn "Red's turn" "Blue's turn")
+       (piece-text winner "Red has won!" "Blue has won!")))))
 
 (om/root board-view
          game-state
