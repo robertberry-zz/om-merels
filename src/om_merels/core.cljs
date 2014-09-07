@@ -47,6 +47,7 @@
    {:turn :red
     :players {:red {:remaining 3}
               :blue {:remaining 3}}
+    :selected nil
     :pieces (cons (empty-piece centre-x centre-y) outer-pieces)}))
 
 (defn winner [[centre & spokes]]
@@ -72,6 +73,7 @@
                        :stroke (if mouse-over? "red" "black")
                        :strokeWidth 2
                        :fill (piece-fill piece)
+                       :style #js {:cursor "pointer"}
                        :onClick (fn [_] (put! clicks state))}))))
 
 (defn stroke-from-centre [{:keys [x y]}]
@@ -140,8 +142,9 @@
 
 (defn turn-view [app owner]
   (om/component
-   (dom/p nil
-          ({:red "Red's turn" :blue "Blue's turn"} (:turn app)))))
+   (let [turn (:turn app)]
+     (dom/p #js {:style #js {:color ({:red "#cc0000" :blue "#0000cc"} turn)}}
+            ({:red "Red's turn" :blue "Blue's turn"} turn)))))
 
 (om/root board-view
          game-state
