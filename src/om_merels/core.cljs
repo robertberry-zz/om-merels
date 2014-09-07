@@ -65,17 +65,14 @@
 (defn position-view [{:keys [centre-x centre-y piece mouse-over? selected?] :as state} owner]
   (reify
     om/IRenderState
-    (render-state [_ {:keys [highlight clicks]}]
+    (render-state [_ {:keys [clicks]}]
       (dom/circle #js {:cx centre-x
                        :cy centre-y
                        :r piece-radius
                        :stroke (if mouse-over? "red" "black")
                        :strokeWidth 2
                        :fill (piece-fill piece)
-                       :onClick (fn [_] (put! clicks state))
-                       :onMouseOver (fn [_] (put! highlight state))
-                       :onMouseOut (fn [_] (put! highlight :clear))
-                       }))))
+                       :onClick (fn [_] (put! clicks state))}))))
 
 (defn stroke-from-centre [{:keys [x y]}]
   (dom/line #js {:x1 centre-x :y1 centre-y :x2 x :y2 y :stroke "black"}))
@@ -106,19 +103,10 @@
   (reify
     om/IInitState
     (init-state [_]
-      {:highlight (chan)
-       :clicks (chan)})
+      {:clicks (chan)})
     om/IWillMount
     (will-mount [_]
       (do
-       (let [highlight (om/get-state owner :highlight)]
-         (go (loop []
-               (let [position (<! highlight)]
-                 (om/transact! app :pieces
-                               (if (= :clear position)
-                                 #(map (fn [piece] (assoc piece :mouse-over? nil)) %)
-                                 (transforming-piece position #(assoc % :mouse-over? true)))))
-               (recur))))
        (let [clicks (om/get-state owner :clicks)]
          (go (loop []
                (let [position (<! clicks)
