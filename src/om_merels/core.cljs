@@ -138,6 +138,15 @@
         (concat (map stroke-from-centre outer-piece-positions)
                 (om/build-all position-view (:pieces app) {:init-state state}))))))
 
+(defn turn-view [app owner]
+  (om/component
+   (dom/p nil
+          ({:red "Red's turn" :blue "Blue's turn"} (:turn app)))))
+
 (om/root board-view
          game-state
          {:target (.getElementById js/document "merels")})
+
+(om/root turn-view
+         game-state
+         {:target (.getElementById js/document "turn-text")})
