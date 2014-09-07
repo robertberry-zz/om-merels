@@ -60,16 +60,19 @@
                  :red "red"
                  :blue "blue"})
 
+(def other-piece {:red :blue :blue :red})
+
 (defn position-view [{:keys [centre-x centre-y piece mouse-over? selected?] :as state} owner]
   (reify
     om/IRenderState
-    (render-state [_ {:keys [highlight]}]
+    (render-state [_ {:keys [highlight clicks]}]
       (dom/circle #js {:cx centre-x
                        :cy centre-y
                        :r piece-radius
                        :stroke (if mouse-over? "red" "black")
                        :strokeWidth 2
                        :fill (piece-fill piece)
+                       :onClick (fn [_] (put! clicks state))
                        :onMouseOver (fn [_] (put! highlight state))
                        :onMouseOut (fn [_] (put! highlight :clear))
                        }))))
@@ -103,17 +106,32 @@
   (reify
     om/IInitState
     (init-state [_]
-      {:highlight (chan)})
+      {:highlight (chan)
+       :clicks (chan)})
     om/IWillMount
     (will-mount [_]
-      (let [highlight (om/get-state owner :highlight)]
-        (go (loop []
-              (let [position (<! highlight)]
-                (om/transact! app :pieces
-                  (if (= :clear position)
-                    #(map (fn [piece] (assoc piece :mouse-over? nil)) %)
-                    (transforming-piece position #(assoc position :mouse-over? true)))))
-              (recur)))))
+      (do
+       (let [highlight (om/get-state owner :highlight)]
+         (go (loop []
+               (let [position (<! highlight)]
+                 (om/transact! app :pieces
+                               (if (= :clear position)
+                                 #(map (fn [piece] (assoc piece :mouse-over? nil)) %)
+                                 (transforming-piece position #(assoc % :mouse-over? true)))))
+               (recur))))
+       (let [clicks (om/get-state owner :clicks)]
+         (go (loop []
+               (let [position (<! clicks)
+                     turn (:turn @app)
+                     remaining (get-in @app [:players turn :remaining])]
+                 (if (> remaining 0)
+                   (if (= (:piece position) :empty)
+                     (do
+                      (om/update! app [:players turn :remaining] (- remaining 1))
+                      (om/update! app :turn (other-piece turn))
+                      (om/transact! app :pieces 
+                                    (transforming-piece position #(assoc % :piece turn)))))))
+               (recur))))))
     om/IRenderState
     (render-state [_ state]
       (apply dom/svg #js {:width width :height height}
@@ -131,7 +149,6 @@
                   {:init-state {:piece :blue :x centre-x :y (- height piece-diameter)}})
         (concat (map stroke-from-centre outer-piece-positions)
                 (om/build-all position-view (:pieces app) {:init-state state}))))))
-
 
 (om/root board-view
          game-state
